@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Palm Collector</string>
+    <string name="directory">Path :/internal storage/palm_collector_images</string>
+</resources>
