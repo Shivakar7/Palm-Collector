@@ -217,7 +217,7 @@ class AddSubjectActivity : AppCompatActivity() {
                 }
             } else {
                 performImageCapture()
-                //flag = true
+                flag = true
             }
             if (flag == false) {
                 performImageCapture()

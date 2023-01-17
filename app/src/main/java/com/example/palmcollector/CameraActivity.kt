@@ -11,16 +11,13 @@ import android.util.Log
 import android.view.Display
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewTreeObserver
 import android.view.animation.Animation
 import android.view.animation.Transformation
 import android.widget.*
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
-import androidx.camera.core.CameraInfo
-import androidx.camera.core.DisplayOrientedMeteringPointFactory
-import androidx.camera.core.FocusMeteringAction
-import androidx.camera.core.Preview
-import androidx.camera.core.ViewPort
+import androidx.camera.core.*
 import androidx.camera.view.PreviewView
 import com.google.mediapipe.components.TextureFrameConsumer
 import com.google.mediapipe.framework.TextureFrame
@@ -32,6 +29,7 @@ import com.google.mediapipe.solutions.hands.HandsOptions
 import com.google.mediapipe.solutions.hands.HandsResult
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.TimeUnit
 import kotlin.math.sqrt
 
 class CameraActivity : AppCompatActivity(){
@@ -164,102 +162,221 @@ class CameraActivity : AppCompatActivity(){
                 imageView?.setHandsResult(handsResult)
                 runOnUiThread { imageView?.update() }
 
+
+
+
+
                 if (handsResult.let { NativeInterface().display(it).landmarksize } == 21 && imageView!!.frontOrBack(handsResult) ){
-                    var area = 0.0
 
                     val handPointList = handsResult.multiHandLandmarks()?.get(0)?.landmarkList
 
-                    for(k in 0..3){
-                        var a = sqrt(Math.pow(((handPointList!![0].x - handPointList.get(4*k+1).x).toDouble()),2.0) + Math.pow(((handPointList.get(0).y - handPointList.get(4*k+1).y).toDouble()),2.0))
-                        var b = sqrt(Math.pow(((handPointList.get(0).x - handPointList.get(4*(k+1)+1).x).toDouble()),2.0) + Math.pow(((handPointList.get(0).y - handPointList.get(4*(k+1)+1).y).toDouble()),2.0))
-                        var c = sqrt(Math.pow(((handPointList.get(4*k+1).x - handPointList.get(4*(k+1)+1).x).toDouble()),2.0) + Math.pow(((handPointList.get(4*k+1).y - handPointList.get(4*(k+1)+1).y).toDouble()),2.0))
-                        var s = a+b+c
-                        area += (s*(s-a)*(s-b)*(s-c))
-                    }
 
-                    Log.e("wrist xylo areavalue", "$area")
+                    Log.e("coorvalue", "${handPointList!![17].x}" )
 
-                    //runOnUiThread {
-                    if(area in 1.5..5.0){
-                        framecount++
-                        Log.i("beluga_isPalm", "${imageView?.frontOrBack(handsResult)}")
-                        Log.i("walter_isLeft", "${imageView?.calculatehandedness(handsResult)}")
-                        runOnUiThread{guide.text = "Hold still"}
+//                   Left hand
+
+                    if(imageView?.calculatehandedness(handsResult) == false){
+                        if(handPointList!![0].y < 1.0 && handPointList!![2].x > 0.2 && handPointList!![17].x < 0.8  && handPointList!![5].y > 0.0  && ((handPointList!![5].z) - (handPointList!![17].z)) in 0.0..0.1){
+
+                            var area = 0.0
+
+                            for(k in 0..3){
+                                var a = sqrt(Math.pow(((handPointList!![0].x - handPointList.get(4*k+1).x).toDouble()),2.0) + Math.pow(((handPointList.get(0).y - handPointList.get(4*k+1).y).toDouble()),2.0))
+                                var b = sqrt(Math.pow(((handPointList.get(0).x - handPointList.get(4*(k+1)+1).x).toDouble()),2.0) + Math.pow(((handPointList.get(0).y - handPointList.get(4*(k+1)+1).y).toDouble()),2.0))
+                                var c = sqrt(Math.pow(((handPointList.get(4*k+1).x - handPointList.get(4*(k+1)+1).x).toDouble()),2.0) + Math.pow(((handPointList.get(4*k+1).y - handPointList.get(4*(k+1)+1).y).toDouble()),2.0))
+                                var s = a+b+c
+                                area += (s*(s-a)*(s-b)*(s-c))
+                            }
+
+                            Log.e("wrist xylo areavalue", "$area")
+
+                            //runOnUiThread {
+                            //if(area in 1.5..5.0){
+                            if(area > 0.4){
+                                framecount++
+                                Log.i("beluga_isPalm", "${imageView?.frontOrBack(handsResult)}")
+                                Log.i("walter_isLeft", "${imageView?.calculatehandedness(handsResult)}")
+                                runOnUiThread{guide.text = "Hold still"}
 
 //                        if(flash){
 //                            cameraInput!!.torchOn()
 //                        }
 
-                        //stopCurrentPipeline()
-                        //imageanalysis
-                        if(framecount>15){
-                            var bitmap = handsResult.inputBitmap()
-                            if (imageView?.calculatehandedness(handsResult) == true) {
-                                leftOrRight = "right"
-                            } else {
-                                leftOrRight = "left"
-                            }
-                            if (imageView?.frontOrBack(handsResult) == true) {
-                                palmOrBack = "palm"
-                            } else {
-                                palmOrBack = "back"
-                            }
-                            //imageanalysis
-                            val matrix = Matrix()
+                                //stopCurrentPipeline()
+                                //imageanalysis
+                                if(framecount>15){
+                                    var bitmap = handsResult.inputBitmap()
+                                    if (imageView?.calculatehandedness(handsResult) == true) {
+                                        leftOrRight = "right"
+                                    } else {
+                                        leftOrRight = "left"
+                                    }
+                                    if (imageView?.frontOrBack(handsResult) == true) {
+                                        palmOrBack = "palm"
+                                    } else {
+                                        palmOrBack = "back"
+                                    }
+                                    //imageanalysis
+                                    val matrix = Matrix()
 
-                            matrix.postRotate(180f)
-                            val cx = bitmap.width / 2f
-                            val cy = bitmap.height / 2f
+                                    matrix.postRotate(180f)
+                                    val cx = bitmap.width / 2f
+                                    val cy = bitmap.height / 2f
 
-                            val scaledBitmap = Bitmap.createScaledBitmap(bitmap, bitmap.width, bitmap.height, true)
-                            val rotatedBitmap = Bitmap.createBitmap(
-                                scaledBitmap,
-                                0,
-                                0,
-                                scaledBitmap.width,
-                                scaledBitmap.height,
-                                matrix,
-                                true
-                            )
-                            val flippedBitmap = rotatedBitmap.flip(-1f, 1f, cx, cy)
+                                    val scaledBitmap = Bitmap.createScaledBitmap(bitmap, bitmap.width, bitmap.height, true)
+                                    val rotatedBitmap = Bitmap.createBitmap(
+                                        scaledBitmap,
+                                        0,
+                                        0,
+                                        scaledBitmap.width,
+                                        scaledBitmap.height,
+                                        matrix,
+                                        true
+                                    )
+                                    val flippedBitmap = rotatedBitmap.flip(-1f, 1f, cx, cy)
 
-                            handPointList!!.get(0).x
-                            handPointList.get(0).y
-                            handPointList.get(0).z
+                                    handPointList!!.get(0).x
+                                    handPointList.get(0).y
+                                    handPointList.get(0).z
 
-                            Log.e("wrist xylo x", "${handPointList.get(0).x}")
-                            Log.e("wrist xylo y", "${handPointList.get(0).y}")
-                            Log.e("wrist xylo z", "${handPointList.get(0).z}")
+                                    Log.e("wrist xylo x", "${handPointList.get(0).x}")
+                                    Log.e("wrist xylo y", "${handPointList.get(0).y}")
+                                    Log.e("wrist xylo z", "${handPointList.get(0).z}")
 
-                            val preview = Preview.Builder().build()
+                                    val preview = Preview.Builder().build()
 
 //                            val whiteu = findViewById<ImageView>(R.id.capture_screen_flash)
 //                            FadeIn(whiteu, 1, 2, 5000, true)
 
-                        var uri = SaveImage(flippedBitmap)
-                        var i = Intent(this, AddSubjectActivity::class.java)
-                        i.putExtra("bitmapURI_intent", uri.toString())
-                        i.putExtra("handedness_intent", leftOrRight)
-                        i.putExtra("frontOrBack_intent", palmOrBack)
-                        setResult(78, i)
-                        finish()
-                        }
+                                    var uri = SaveImage(flippedBitmap)
+                                    var i = Intent(this, AddSubjectActivity::class.java)
+                                    i.putExtra("bitmapURI_intent", uri.toString())
+                                    i.putExtra("handedness_intent", leftOrRight)
+                                    i.putExtra("frontOrBack_intent", palmOrBack)
+                                    setResult(78, i)
+                                    finish()
+                                }
 
-                    } else if (area in 0.0..1.5) {
-                        runOnUiThread{guide.text = "Bring palm closer"}
-                        framecount = 0
-                        //cameraInput!!.torchOff()
-                    } else if (area > 5.0){
-                        runOnUiThread{guide.text = "Place palm further"}
-                        framecount = 0
-                        //cameraInput!!.torchOff()
+                            } else if (area in 0.0..1.5) {
+                                runOnUiThread{guide.text = "Bring palm closer"}
+                                framecount = 0
+                                //cameraInput!!.torchOff()
+                            } else if (area > 5.0){
+                                runOnUiThread{guide.text = "Place palm further"}
+                                framecount = 0
+                                //cameraInput!!.torchOff()
+                            }
+                        } else {
+                            framecount = 0
+                            runOnUiThread{guide.text = "No Palm detected"}
+                            //cameraInput!!.torchOff()
+                        }
                     }
-                } else {
-                    framecount = 0
-                    runOnUiThread{guide.text = "No Palm detected"}
-                    //cameraInput!!.torchOff()
+
+                    //Right hand
+
+                    if(imageView?.calculatehandedness(handsResult) == true){
+                        if(handPointList!![0].y < 1.0 && handPointList!![2].x < 0.8 && handPointList!![17].x > 0.2 && handPointList!![5].y > 0.0 && ((handPointList!![5].z) - (handPointList!![17].z)) in 0.0..0.1){
+
+                            var area = 0.0
+
+                            Log.e("dgp", "${(handPointList!![5].z) - (handPointList!![17].z) }" )
+
+                            for(k in 0..3){
+                                var a = sqrt(Math.pow(((handPointList!![0].x - handPointList.get(4*k+1).x).toDouble()),2.0) + Math.pow(((handPointList.get(0).y - handPointList.get(4*k+1).y).toDouble()),2.0))
+                                var b = sqrt(Math.pow(((handPointList.get(0).x - handPointList.get(4*(k+1)+1).x).toDouble()),2.0) + Math.pow(((handPointList.get(0).y - handPointList.get(4*(k+1)+1).y).toDouble()),2.0))
+                                var c = sqrt(Math.pow(((handPointList.get(4*k+1).x - handPointList.get(4*(k+1)+1).x).toDouble()),2.0) + Math.pow(((handPointList.get(4*k+1).y - handPointList.get(4*(k+1)+1).y).toDouble()),2.0))
+                                var s = a+b+c
+                                area += (s*(s-a)*(s-b)*(s-c))
+                            }
+
+                            Log.e("wrist xylo areavalue", "$area")
+
+                            //runOnUiThread {
+                            //if(area in 1.5..5.0){
+                            if(area > 0.4){
+                                framecount++
+                                Log.i("beluga_isPalm", "${imageView?.frontOrBack(handsResult)}")
+                                Log.i("walter_isLeft", "${imageView?.calculatehandedness(handsResult)}")
+                                runOnUiThread{guide.text = "Hold still"}
+
+//                        if(flash){
+//                            cameraInput!!.torchOn()
+//                        }
+
+                                //stopCurrentPipeline()
+                                //imageanalysis
+                                if(framecount>15){
+                                    var bitmap = handsResult.inputBitmap()
+                                    if (imageView?.calculatehandedness(handsResult) == true) {
+                                        leftOrRight = "right"
+                                    } else {
+                                        leftOrRight = "left"
+                                    }
+                                    if (imageView?.frontOrBack(handsResult) == true) {
+                                        palmOrBack = "palm"
+                                    } else {
+                                        palmOrBack = "back"
+                                    }
+                                    //imageanalysis
+                                    val matrix = Matrix()
+
+                                    matrix.postRotate(180f)
+                                    val cx = bitmap.width / 2f
+                                    val cy = bitmap.height / 2f
+
+                                    val scaledBitmap = Bitmap.createScaledBitmap(bitmap, bitmap.width, bitmap.height, true)
+                                    val rotatedBitmap = Bitmap.createBitmap(
+                                        scaledBitmap,
+                                        0,
+                                        0,
+                                        scaledBitmap.width,
+                                        scaledBitmap.height,
+                                        matrix,
+                                        true
+                                    )
+                                    val flippedBitmap = rotatedBitmap.flip(-1f, 1f, cx, cy)
+
+                                    handPointList!!.get(0).x
+                                    handPointList.get(0).y
+                                    handPointList.get(0).z
+
+                                    Log.e("wrist xylo x", "${handPointList.get(0).x}")
+                                    Log.e("wrist xylo y", "${handPointList.get(0).y}")
+                                    Log.e("wrist xylo z", "${handPointList.get(0).z}")
+
+                                    val preview = Preview.Builder().build()
+
+//                            val whiteu = findViewById<ImageView>(R.id.capture_screen_flash)
+//                            FadeIn(whiteu, 1, 2, 5000, true)
+
+                                    var uri = SaveImage(flippedBitmap)
+                                    var i = Intent(this, AddSubjectActivity::class.java)
+                                    i.putExtra("bitmapURI_intent", uri.toString())
+                                    i.putExtra("handedness_intent", leftOrRight)
+                                    i.putExtra("frontOrBack_intent", palmOrBack)
+                                    setResult(78, i)
+                                    finish()
+                                }
+
+                            } else if (area in 0.0..1.5) {
+                                runOnUiThread{guide.text = "Bring palm closer"}
+                                framecount = 0
+                                //cameraInput!!.torchOff()
+                            } else if (area > 5.0){
+                                runOnUiThread{guide.text = "Place palm further"}
+                                framecount = 0
+                                //cameraInput!!.torchOff()
+                            }
+                        } else {
+                            framecount = 0
+                            runOnUiThread{guide.text = "No Palm detected"}
+                            //cameraInput!!.torchOff()
+                        }
+                    }
                 }
             })
+
 
         // The runnable to start camera after the gl surface view is attached.
         // For video input source, videoInput.start() will be called when the video uri is available.
@@ -276,6 +393,22 @@ class CameraActivity : AppCompatActivity(){
 
         glSurfaceView!!.visibility = View.VISIBLE
         previewView.requestLayout()
+
+//        previewView.afterMeasured {
+//            val autoFocusPoint = SurfaceOrientedMeteringPointFactory(1f, 1f)
+//                .createPoint(.5f, .5f)
+//
+//            val autoFocusAction = FocusMeteringAction.Builder(
+//                autoFocusPoint,
+//                FocusMeteringAction.FLAG_AF
+//            ).apply {
+//                //start auto-focusing after 2 seconds
+//                setAutoCancelDuration(2, TimeUnit.SECONDS)
+//            }.build()
+//            //camera.cameraControl.startFocusAndMetering(autoFocusAction)
+//            //cameraInput!!.cameraObj(autoFocusAction)
+//        }
+
         //
         previewView!!.setOnTouchListener(View.OnTouchListener { view: View, motionEvent: MotionEvent ->
             //Log.e("camtouch", "touch")
@@ -333,6 +466,21 @@ class CameraActivity : AppCompatActivity(){
 //                .build()
 //        }
     }
+
+//    inline fun View.afterMeasured(crossinline block: () -> Unit) {
+//        if (measuredWidth > 0 && measuredHeight > 0) {
+//            block()
+//        } else {
+//            viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
+//                override fun onGlobalLayout() {
+//                    if (measuredWidth > 0 && measuredHeight > 0) {
+//                        viewTreeObserver.removeOnGlobalLayoutListener(this)
+//                        block()
+//                    }
+//                }
+//            })
+//        }
+//    }
 
 
     private fun Bitmap.flip(x: Float, y: Float, cx: Float, cy: Float): Bitmap {

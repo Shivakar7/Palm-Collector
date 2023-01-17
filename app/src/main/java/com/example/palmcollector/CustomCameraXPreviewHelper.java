@@ -194,6 +194,7 @@ public class CustomCameraXPreviewHelper extends CameraHelper {
 
 
 
+
 //    public void setUpTapToFocus() {
 //        this.previewView.getSurfaceProvider();
 //        this.previewView.setOnTouchListener(new View.OnTouchListener() {
